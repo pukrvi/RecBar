@@ -157,7 +157,9 @@ The app is ad-hoc signed for local use. Distributing to other Macs still require
 - **Recover Interrupted Recordings…**
 - **Relaunch RecBar / Quit RecBar**
 
-While recording, the menu-bar icon turns red and shows a live timer and size. While merging, it shows progress.
+While recording, the menu-bar icon and live timer switch to white on a dark or vibrant-dark menu bar and black on a light one. Both the artwork and the timer text use the same explicit colour, so they stay readable on translucent or coloured menu bars instead of being tinted into the background. While merging, the icon shows progress.
+
+RecBar ships white and black SVG variants for every state (`Resources/MenuBar/menubar-*-white.svg` and `-black.svg`) and picks the variant from the status item's effective appearance, refreshing automatically when macOS changes appearance.
 
 ## Headless self-tests
 
@@ -168,23 +170,26 @@ No screen, microphone, or camera permission needed:
 .build/release/RecBar --selftest-recovery
 ```
 
-`--selftest` generates four seconds of synthetic video plus two independent audio sources, writes one-second segments for screen, camera, system audio, and mic, merges them, and asserts the exact track layout:
+`--selftest` generates four seconds of synthetic video plus three independent audio sources (system audio and two microphones), writes one-second segments for screen, camera, and every audio track, merges them, and asserts the exact track layout:
 
 ```
-SELFTEST segments: screen=4 camera=4 systemAudio=4 mic=4
-SELFTEST merged screen: duration=4.00s tracks=v1/a2 bytes=297969
-SELFTEST merged camera: duration=4.00s tracks=v1/a1 bytes=170963
+SELFTEST segments: screen=4 camera=4 systemAudio=4 mic=4 mic2=4
+SELFTEST merged screen: duration=4.00s tracks=v1/a3 bytes=427919
+SELFTEST merged camera: duration=4.00s tracks=v1/a2 bytes=300913
 SELFTEST standalone audio system: duration=4.00s tracks=1 bytes=106456 path=system.m4a
 SELFTEST standalone audio mic-test: duration=4.00s tracks=1 bytes=121822 path=mic-test.m4a
+SELFTEST standalone audio mic-test-2: duration=4.00s tracks=1 bytes=128188 path=mic-test-2.m4a
 SELFTEST PASS
 ```
+
+This proves the multi-mic path without needing two physical microphones: the screen file carries all three audio tracks, the camera file carries the two microphone tracks only, and each source gets its own standalone backup.
 
 `--selftest-recovery` writes three segments per track, records only the first two in the manifest (simulating a crash between the atomic rename and the manifest write), adds stale partial files, then scans and recovers the session:
 
 ```
 SELFTEST-RECOVERY scan: screen=3 camera=3 audioTracks=2
-SELFTEST-RECOVERY merged screen: duration=3.00s tracks=v1/a2 bytes=109322
-SELFTEST-RECOVERY merged camera: duration=3.00s tracks=v1/a1 bytes=45273
+SELFTEST-RECOVERY merged screen: duration=3.00s tracks=v1/a2 bytes=102352
+SELFTEST-RECOVERY merged camera: duration=3.00s tracks=v1/a1 bytes=44284
 SELFTEST-RECOVERY PASS
 ```
 

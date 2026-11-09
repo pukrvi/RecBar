@@ -9,9 +9,27 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
     private let menu = NSMenu()
     private var displays: [DisplayInfo] = []
     private var displayTask: Task<Void, Never>?
-    /// Vector menu-bar artwork parsed once per state. `refresh()` runs every second
-    /// while recording, so re-decoding the SVG on each tick would be wasteful.
+    /// Vector menu-bar artwork parsed once per state and appearance. `refresh()` runs
+    /// every second while recording, so re-decoding the SVG on each tick would be wasteful.
     private var statusImages: [String: NSImage] = [:]
+    /// System appearance changes while RecBar is idle would otherwise leave a stale
+    /// black/white icon in the menu bar until the next recording tick.
+    private var appearanceObservers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
+
+    /// Menu-bar artwork is shipped in two explicit colours instead of relying on
+    /// template tinting: a tinted template (or a tinted title) can render dark
+    /// against a dark translucent or coloured menu bar. The variants are picked
+    /// from the status item's effective appearance, which reflects the actual
+    /// menu-bar style (Aqua on a light bar, Dark Aqua on a dark bar).
+    private enum BarStyle {
+        /// Black artwork and text for a light menu bar.
+        case light
+        /// White artwork and text for a dark menu bar.
+        case dark
+
+        var suffix: String { self == .dark ? "white" : "black" }
+        var color: NSColor { self == .dark ? .white : .black }
+    }
 
     // MARK: Setup
 
@@ -31,8 +49,15 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
             button.font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
         }
 
+        observeAppearanceChanges()
         refresh()
         refreshDisplays()
+    }
+
+    deinit {
+        for observer in appearanceObservers {
+            observer.center.removeObserver(observer.token)
+        }
     }
 
     // MARK: Status item
@@ -41,52 +66,132 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
     public func refresh() {
         guard let button = statusItem.button else { return }
 
+        let style = currentBarStyle
+        // The artwork and title carry explicit colours; any tint would override them.
+        button.contentTintColor = nil
+
         switch controller.state {
         case .idle:
-            button.image = statusImage("menubar-idle", fallbackSymbol: "record.circle")
-            button.contentTintColor = nil
-            button.title = ""
+            button.image = statusImage(
+                "menubar-idle-\(style.suffix)",
+                fallbackSymbol: "record.circle"
+            )
+            setTitle("", style: style)
         case .recording:
-            button.image = statusImage("menubar-recording", fallbackSymbol: "record.circle.fill")
-            button.contentTintColor = .systemRed
-            button.title = " " + Formatting.clock(controller.elapsed)
+            button.image = statusImage(
+                "menubar-recording-\(style.suffix)",
+                fallbackSymbol: "record.circle.fill"
+            )
+            setTitle(" " + Formatting.clock(controller.elapsed), style: style)
         case .paused:
-            button.image = statusImage("menubar-paused", fallbackSymbol: "pause.circle.fill")
-            button.contentTintColor = .systemOrange
-            button.title = " " + Formatting.clock(controller.elapsed)
+            button.image = statusImage(
+                "menubar-paused-\(style.suffix)",
+                fallbackSymbol: "pause.circle.fill"
+            )
+            setTitle(" " + Formatting.clock(controller.elapsed), style: style)
         case .merging:
-            button.image = statusImage("menubar-exporting", fallbackSymbol: "arrow.triangle.2.circlepath")
-            button.contentTintColor = nil
+            button.image = statusImage(
+                "menubar-exporting-\(style.suffix)",
+                fallbackSymbol: "arrow.triangle.2.circlepath"
+            )
             let percent = Int((controller.mergeProgress * 100).rounded())
-            button.title = " \(percent)%"
+            setTitle(" \(percent)%", style: style)
         case .starting, .stopping:
-            button.image = statusImage("menubar-saving", fallbackSymbol: "arrow.triangle.2.circlepath")
-            button.contentTintColor = nil
-            button.title = ""
+            button.image = statusImage(
+                "menubar-saving-\(style.suffix)",
+                fallbackSymbol: "arrow.triangle.2.circlepath"
+            )
+            setTitle("", style: style)
         case .recovering:
-            button.image = statusImage("menubar-exporting", fallbackSymbol: "arrow.triangle.2.circlepath")
-            button.contentTintColor = nil
-            button.title = ""
+            button.image = statusImage(
+                "menubar-exporting-\(style.suffix)",
+                fallbackSymbol: "arrow.triangle.2.circlepath"
+            )
+            setTitle("", style: style)
         }
     }
 
-    /// Loads the shipped vector menu-bar artwork as a template image so macOS tints
-    /// it for light/dark menu bars. Falls back to an SF Symbol when running the bare
-    /// binary, which has no bundle resources.
+    /// The menu bar can be dark even when the app is in light mode (and vice versa),
+    /// so prefer the status button's appearance over the app-wide one.
+    private var currentBarStyle: BarStyle {
+        let appearance = statusItem.button?.effectiveAppearance ?? NSApp.effectiveAppearance
+        return appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .dark : .light
+    }
+
+    /// Uses an attributed title so the timer is explicitly white or black instead of
+    /// inheriting the system's vibrant menu-bar tint.
+    private func setTitle(_ text: String, style: BarStyle) {
+        guard let button = statusItem.button else { return }
+        guard !text.isEmpty else {
+            button.attributedTitle = NSAttributedString(string: "")
+            return
+        }
+        let font = button.font
+            ?? NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        button.attributedTitle = NSAttributedString(
+            string: text,
+            attributes: [
+                .font: font,
+                .foregroundColor: style.color
+            ]
+        )
+    }
+
+    /// Loads the shipped black or white vector variant. Falls back to a template
+    /// SF Symbol, which macOS tints correctly, when running the bare binary without
+    /// bundle resources.
     private func statusImage(_ name: String, fallbackSymbol: String) -> NSImage? {
         if let cached = statusImages[name] {
             return cached
         }
 
-        let image = Bundle.main.url(forResource: name, withExtension: "svg")
-            .flatMap { NSImage(contentsOf: $0) }
-            ?? NSImage(systemSymbolName: fallbackSymbol, accessibilityDescription: "RecBar")
-        image?.isTemplate = true
-        image?.size = NSSize(width: 18, height: 18)
-        if let image {
+        if let url = Bundle.main.url(forResource: name, withExtension: "svg"),
+           let image = NSImage(contentsOf: url) {
+            // Explicitly not a template: the SVG already contains the final colour.
+            image.isTemplate = false
+            image.size = NSSize(width: 18, height: 18)
             statusImages[name] = image
+            return image
         }
-        return image
+
+        let symbol = NSImage(
+            systemSymbolName: fallbackSymbol,
+            accessibilityDescription: "RecBar"
+        )
+        symbol?.size = NSSize(width: 18, height: 18)
+        return symbol
+    }
+
+    /// Refreshes the icon when macOS switches between light and dark appearance, or
+    /// when accessibility display options change the menu-bar appearance.
+    private func observeAppearanceChanges() {
+        let theme = DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.refresh() }
+        }
+        appearanceObservers.append((DistributedNotificationCenter.default(), theme))
+
+        let accessibility = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.refresh() }
+        }
+        appearanceObservers.append((NSWorkspace.shared.notificationCenter, accessibility))
+
+        // Catches appearance changes that happened while the app was inactive.
+        let active = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.refresh() }
+        }
+        appearanceObservers.append((NotificationCenter.default, active))
     }
 
     // MARK: Menu construction

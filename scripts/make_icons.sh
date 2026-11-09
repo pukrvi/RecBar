@@ -36,9 +36,15 @@ render icon_512x512@2x.png 1024
 iconutil -c icns "$ICONSET" -o "$OUT/AppIcon.icns"
 
 mkdir -p "$OUT/MenuBar"
-rm -f "$OUT/MenuBar"/*.png
+rm -f "$OUT/MenuBar"/*.png "$OUT/MenuBar"/*.svg
+# Source artwork uses currentColor everywhere, with the root color set to white.
+# The black variant is the same vector with that root color swapped, so both
+# menu-bar appearances stay crisp at every scale without raster upscaling.
 for state in idle recording paused saving saved exporting error; do
-    cp "$SRC/menubar_${state}.svg" "$OUT/MenuBar/menubar-${state}.svg"
+    white="$OUT/MenuBar/menubar-${state}-white.svg"
+    black="$OUT/MenuBar/menubar-${state}-black.svg"
+    cp "$SRC/menubar_${state}.svg" "$white"
+    sed 's/color="#FFFFFF"/color="#000000"/' "$white" > "$black"
 done
 
-echo "Built $OUT/AppIcon.icns and vector menu-bar icons in $OUT/MenuBar"
+echo "Built $OUT/AppIcon.icns and white/black vector menu-bar icons in $OUT/MenuBar"

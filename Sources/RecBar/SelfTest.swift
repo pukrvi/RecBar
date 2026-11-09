@@ -55,22 +55,37 @@ public enum SelfTest {
                 channels: 1,
                 bitrate: 256_000
             ))
+            let secondMicWriter = AudioTrackWriter(config: .init(
+                trackID: "mic-test-2",
+                displayName: "Test Microphone 2",
+                kind: .microphone,
+                folderURL: audioSegmentFolder,
+                segmentSeconds: 1.0,
+                sampleRate: 48_000,
+                channels: 1,
+                bitrate: 256_000
+            ))
             systemWriter.onError = { error in
                 FileHandle.standardError.write(Data("SELFTEST system audio error: \(error)\n".utf8))
             }
             micWriter.onError = { error in
                 FileHandle.standardError.write(Data("SELFTEST mic audio error: \(error)\n".utf8))
             }
+            secondMicWriter.onError = { error in
+                FileHandle.standardError.write(Data("SELFTEST second mic audio error: \(error)\n".utf8))
+            }
 
             screenWriter.start(at: 0)
             cameraWriter.start(at: 0)
             systemWriter.start()
             micWriter.start()
+            secondMicWriter.start()
 
             let base = CMTime(seconds: 10_000, preferredTimescale: 600)
             let totalFrames = 120 // 4 seconds at 30 fps
             var systemPhase = 0.0
             var micPhase = 0.0
+            var secondMicPhase = 0.0
             let samplesPerFrame = 1_600 // 48 kHz / 30 fps
 
             for frame in 0..<totalFrames {
@@ -83,6 +98,7 @@ public enum SelfTest {
                     cameraWriter.rotate(at: offset)
                     systemWriter.rotate(at: offset)
                     micWriter.rotate(at: offset)
+                    secondMicWriter.rotate(at: offset)
                 }
 
                 if let screenBuffer = SampleBufferFactory.videoSampleBuffer(
@@ -110,6 +126,13 @@ public enum SelfTest {
                     micWriter.append(micAudio)
                     micPhase += Double(samplesPerFrame) * 2.0 * .pi * 440.0 / 48_000.0
                 }
+                if let secondMicAudio = SampleBufferFactory.audioSampleBuffer(
+                    sampleRate: 48_000, channels: 1, presentationTime: videoPTS,
+                    frameCount: samplesPerFrame, phase: secondMicPhase
+                ) {
+                    secondMicWriter.append(secondMicAudio)
+                    secondMicPhase += Double(samplesPerFrame) * 2.0 * .pi * 660.0 / 48_000.0
+                }
 
                 try? await Task.sleep(nanoseconds: 33_000_000)
             }
@@ -118,10 +141,12 @@ public enum SelfTest {
             let cameraSegments = try await cameraWriter.finish()
             let systemSegments = try await systemWriter.finish()
             let micSegments = try await micWriter.finish()
+            let secondMicSegments = try await secondMicWriter.finish()
 
-            print("SELFTEST segments: screen=\(screenSegments.count) camera=\(cameraSegments.count) systemAudio=\(systemSegments.count) mic=\(micSegments.count)")
+            print("SELFTEST segments: screen=\(screenSegments.count) camera=\(cameraSegments.count) systemAudio=\(systemSegments.count) mic=\(micSegments.count) mic2=\(secondMicSegments.count)")
             guard screenSegments.count >= 3, cameraSegments.count >= 3,
-                  systemSegments.count >= 3, micSegments.count >= 3 else {
+                  systemSegments.count >= 3, micSegments.count >= 3,
+                  secondMicSegments.count >= 3 else {
                 print("SELFTEST FAIL: expected at least 3 segments per track")
                 return 1
             }
@@ -130,6 +155,7 @@ public enum SelfTest {
             let cameraURLs = cameraSegments.map { segmentFolder.appendingPathComponent($0.fileName) }
             let systemURLs = systemSegments.map { audioSegmentFolder.appendingPathComponent($0.fileName) }
             let micURLs = micSegments.map { audioSegmentFolder.appendingPathComponent($0.fileName) }
+            let secondMicURLs = secondMicSegments.map { audioSegmentFolder.appendingPathComponent($0.fileName) }
 
             let mergeService = MergeService()
             let outcome = try await mergeService.merge(
@@ -149,6 +175,13 @@ public enum SelfTest {
                         kind: .microphone,
                         segments: micURLs,
                         outputFileName: "audio/mic-test.m4a"
+                    ),
+                    MergeAudioTrack(
+                        id: "mic-test-2",
+                        name: "Test Microphone 2",
+                        kind: .microphone,
+                        segments: secondMicURLs,
+                        outputFileName: "audio/mic-test-2.m4a"
                     )
                 ],
                 folderURL: root,
@@ -179,14 +212,14 @@ public enum SelfTest {
             if screenDuration < 3.0 || screenDuration > 6.0 { failures.append("screen duration \(screenDuration)") }
             if cameraDuration < 3.0 || cameraDuration > 6.0 { failures.append("camera duration \(cameraDuration)") }
             if screenVideoTracks != 1 { failures.append("screen video track count \(screenVideoTracks)") }
-            if screenAudioTracks != 2 { failures.append("screen audio track count \(screenAudioTracks), expected 2") }
+            if screenAudioTracks != 3 { failures.append("screen audio track count \(screenAudioTracks), expected 3") }
             if cameraVideoTracks != 1 { failures.append("camera video track count \(cameraVideoTracks)") }
-            if cameraAudioTracks != 1 { failures.append("camera audio track count \(cameraAudioTracks), expected 1 (mic only)") }
+            if cameraAudioTracks != 2 { failures.append("camera audio track count \(cameraAudioTracks), expected 2 (mics only)") }
             if screenBytes < 100_000 { failures.append("screen file too small (\(screenBytes))") }
             if cameraBytes < 50_000 { failures.append("camera file too small (\(cameraBytes))") }
 
-            if outcome.audioURLs.count != 2 {
-                failures.append("expected 2 standalone audio files, got \(outcome.audioURLs.count)")
+            if outcome.audioURLs.count != 3 {
+                failures.append("expected 3 standalone audio files, got \(outcome.audioURLs.count)")
             }
             for (trackID, url) in outcome.audioURLs {
                 let asset = AVURLAsset(url: url)
