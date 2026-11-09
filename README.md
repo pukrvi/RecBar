@@ -10,6 +10,24 @@ RecBar records your screen with hardware-encoded HEVC and writes **every audio s
 
 No OBS. No cloud. No giant QuickTime capture file.
 
+## Download
+
+**[Download RecBar.dmg](https://github.com/pukrvi/RecBar/releases/latest/download/RecBar.dmg)** — macOS 15 or later, Apple Silicon.
+
+1. Open the downloaded `RecBar.dmg`.
+2. Drag **RecBar** onto the **Applications** folder.
+3. Open **Applications → RecBar**. RecBar appears in the menu bar, not the Dock.
+4. The first launch is blocked because this build is ad-hoc signed, not notarized. Right-click **RecBar** in Applications and choose **Open**, then **Open** again. If macOS does not offer that, use **System Settings → Privacy & Security → Open Anyway**.
+5. Grant **Screen Recording**, then click **Relaunch RecBar** in the alert.
+
+If macOS asks whether to replace an existing `RecBar`, choose **Replace** — that is the normal upgrade path. Recordings and settings are not touched.
+
+Each release also publishes `RecBar.dmg.sha256`:
+
+```bash
+shasum -a 256 ~/Downloads/RecBar.dmg
+```
+
 ---
 
 ## Screenshots
@@ -134,7 +152,25 @@ The build script prints the designated requirement so you can confirm it:
 designated => identifier "app.recbar.recorder"
 ```
 
-The app is ad-hoc signed for local use. Distributing to other Macs still requires a Developer ID signature and notarization.
+The app is ad-hoc signed with a stable designated requirement, so macOS keeps the Screen Recording grant across rebuilds. The published DMG is also ad-hoc signed; it is not notarized, which is why the first launch needs the one-time **Open** step above. A Developer ID certificate and notarization would remove that step.
+
+### Build the DMG
+
+```bash
+./scripts/make_dmg.sh       # -> dist/RecBar.dmg + dist/RecBar.dmg.sha256
+```
+
+Normal builds use the committed `Resources/DMG.DS_Store` and never open Finder. If you change the background or icon layout, regenerate that file once on a Mac with a GUI:
+
+```bash
+defaults write com.apple.finder AppleShowAllFiles -bool true
+killall Finder
+./scripts/make_dmg.sh --restyle
+defaults write com.apple.finder AppleShowAllFiles -bool false
+killall Finder
+```
+
+`--restyle` needs hidden files visible so Finder can position `.background` and `.VolumeIcon.icns` off-screen; otherwise they appear in the top-left corner for anyone who enables hidden files. The volume name is always `RecBar`, because the baked `.DS_Store` resolves its background picture relative to that name.
 
 ## First run
 
@@ -220,7 +256,7 @@ AVCapture camera ──────────> SegmentWriter(camera) ───
 - Records a **display**, not a single window.
 - A hard crash loses at most the current 30-second segment per source; that window is configurable in `RecorderSettings.segmentSeconds`.
 - System audio is captured through ScreenCaptureKit; DRM-protected playback may be silent, which is a macOS limitation.
-- Ad-hoc signing is for local use. Other Macs need Developer ID signing and notarization.
+- The published DMG is ad-hoc signed, not notarized, so the first launch requires the one-time **Open** step described in [Download](#download). A Developer ID certificate would remove it.
 - Each additional microphone adds about 115 MB per hour.
 
 ## Troubleshooting
