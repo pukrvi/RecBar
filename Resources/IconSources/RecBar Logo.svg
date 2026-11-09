@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<defs>
+ <linearGradient id="base" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffba85"/><stop offset=".28" stop-color="#fb45a4"/><stop offset=".57" stop-color="#b00cf1"/><stop offset="1" stop-color="#0924a3"/></linearGradient>
+ <linearGradient id="wave1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e900d9"/><stop offset=".55" stop-color="#8714f5"/><stop offset="1" stop-color="#3122c3"/></linearGradient>
+ <linearGradient id="wave2" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a900f5"/><stop offset="1" stop-color="#111c9b"/></linearGradient>
+ <linearGradient id="white" x1="0" y1="0" x2=".65" y2="1"><stop stop-color="#fff"/><stop offset=".64" stop-color="#fff9ff"/><stop offset="1" stop-color="#d3b9ff"/></linearGradient>
+ <linearGradient id="inside" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a0009b"/><stop offset=".55" stop-color="#42038b"/><stop offset="1" stop-color="#0c2198"/></linearGradient>
+ <linearGradient id="bars" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#c8a5ff"/></linearGradient>
+ <linearGradient id="record" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff625f"/><stop offset="1" stop-color="#ff111b"/></linearGradient>
+ <clipPath id="clip"><rect x="28" y="28" width="968" height="968" rx="240"/></clipPath>
+</defs>
+<g clip-path="url(#clip)">
+<rect x="28" y="28" width="968" height="968" fill="url(#base)"/>
+<path d="M0 535 C170 435 295 425 410 460 C585 510 720 370 810 280 C905 200 995 230 1050 245 L1050 1024 H0Z" fill="url(#wave1)" opacity=".92"/>
+<path d="M0 745 C100 570 210 560 335 620 C500 700 620 625 770 525 C885 445 955 440 1050 475 L1050 1024 H0Z" fill="url(#wave2)" opacity=".93"/>
+<path d="M0 910 C175 745 265 820 380 855 C560 925 640 735 815 680 C920 645 990 660 1050 705 L1050 1024 H0Z" fill="#111ba3" opacity=".45"/>
+<path d="M735 442 L844 360 Q890 326 917 366 Q926 378 926 401 L926 630 Q926 668 896 679 Q874 686 849 666 L735 581Z" fill="url(#white)"/>
+<rect x="170" y="265" width="602" height="494" rx="160" fill="url(#white)"/>
+<rect x="231" y="328" width="481" height="369" rx="111" fill="url(#inside)"/>
+<g fill="url(#bars)">
+<rect x="281" y="512" width="33" height="39" rx="16.5"/>
+<rect x="333" y="485" width="33" height="94" rx="16.5"/>
+<rect x="389" y="451" width="33" height="155" rx="16.5"/>
+<rect x="445" y="410" width="33" height="236" rx="16.5"/>
+<rect x="501" y="455" width="33" height="148" rx="16.5"/>
+<rect x="557" y="485" width="33" height="94" rx="16.5"/>
+<rect x="613" y="512" width="33" height="39" rx="16.5"/>
+</g>
+<circle cx="636" cy="410" r="43" fill="url(#record)"/>
+</g>
+</svg>
