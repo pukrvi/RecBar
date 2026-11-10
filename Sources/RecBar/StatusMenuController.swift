@@ -13,18 +13,17 @@ public final class StatusMenuController: NSObject {
     private let popover = NSPopover()
     private let hostingController: NSHostingController<PanelView>
 
-    /// Fixed for the life of the app. The idle icon is narrower than the icon
-    /// plus timer, and a variable-length item would re-center the icon and the
-    /// popover whenever recording starts or stops. Reserving the timer's width
-    /// up front keeps the menu-bar icon and the panel anchor perfectly still.
-    private static let statusItemLength: CGFloat = 72
-
     /// Vector menu-bar artwork parsed once per state and appearance. `refresh()` runs
     /// every second while recording, so re-decoding the SVG on each tick would be wasteful.
     private var statusImages: [String: NSImage] = [:]
     /// System appearance changes while RecBar is idle would otherwise leave a stale
     /// black/white icon in the menu bar until the next recording tick.
     private var appearanceObservers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
+    /// Monitors installed only while the panel is open, so a click anywhere outside
+    /// the panel dismisses it even when the click lands on the desktop or another
+    /// app's menu-bar item instead of a normal window.
+    private var panelEventMonitors: [Any] = []
+    private var panelObservers: [NSObjectProtocol] = []
 
     /// Menu-bar artwork is shipped in two explicit colours instead of relying on
     /// template tinting: a tinted template (or a tinted title) can render dark
@@ -45,7 +44,9 @@ public final class StatusMenuController: NSObject {
 
     public init(controller: RecorderController) {
         self.controller = controller
-        self.statusItem = NSStatusBar.system.statusItem(withLength: Self.statusItemLength)
+        // Variable length keeps the idle item as compact as every other menu-bar
+        // icon. It grows only when the timer text appears while recording.
+        self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         let model = PanelModel(controller: controller)
         self.model = model
@@ -87,6 +88,12 @@ public final class StatusMenuController: NSObject {
         for observer in appearanceObservers {
             observer.center.removeObserver(observer.token)
         }
+        for monitor in panelEventMonitors {
+            NSEvent.removeMonitor(monitor)
+        }
+        for observer in panelObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     // MARK: Panel
@@ -110,10 +117,49 @@ public final class StatusMenuController: NSObject {
             NSApp.activate(ignoringOtherApps: true)
         }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        installDismissMonitors()
     }
 
     public func closePanel() {
         popover.performClose(nil)
+    }
+
+    // MARK: Dismissal
+
+    /// `.transient` covers clicks on another app's window, but not every click on
+    /// the desktop or the system menu bar. These monitors make outside clicks
+    /// deterministic without touching clicks inside the panel or its native menus.
+    private func installDismissMonitors() {
+        removeDismissMonitors()
+
+        if let global = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { [weak self] _ in
+            Task { @MainActor in self?.closePanel() }
+        } {
+            panelEventMonitors.append(global)
+        }
+
+        let resign = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.closePanel() }
+        }
+        panelObservers.append(resign)
+    }
+
+    private func removeDismissMonitors() {
+        for monitor in panelEventMonitors {
+            NSEvent.removeMonitor(monitor)
+        }
+        panelEventMonitors.removeAll()
+
+        for observer in panelObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        panelObservers.removeAll()
     }
 
     @objc private func togglePopover() {
@@ -270,6 +316,7 @@ public final class StatusMenuController: NSObject {
 
 extension StatusMenuController: NSPopoverDelegate {
     public func popoverDidClose(_ notification: Notification) {
+        removeDismissMonitors()
         model.hoveredControl = nil
     }
 }

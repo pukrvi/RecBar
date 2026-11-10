@@ -32,9 +32,9 @@ shasum -a 256 ~/Downloads/RecBar.dmg
 
 ## Screenshots
 
-![RecBar menu](docs/menu.png)
+![RecBar panel](docs/menu.png)
 
-![Audio routing: system audio plus any number of microphones](docs/audio-menu.png)
+![Audio tile menu: system audio plus any number of microphones](docs/audio-menu.png)
 
 ![Recording timer in the menu bar](docs/menubar-recording.png)
 
@@ -176,22 +176,34 @@ killall Finder
 
 1. Launch RecBar. It appears as a **record icon in the menu bar** (no Dock icon).
 2. Grant **Screen Recording** when macOS asks, then click **Relaunch RecBar** in the alert (or quit and reopen it).
-3. Open the menu and choose **Audio** to enable system audio and select microphones.
-4. Choose **Start Recording**. macOS asks for **Microphone** and **Camera** access the first time; grant them to include voice and the webcam file.
-5. Stop with **Stop & Save Recording**. The session appears in `~/Movies/RecBar/`.
+3. Click the menu-bar icon to open the panel, then click the **Audio** tile to enable system audio and select microphones.
+4. Click **Start Recording**. macOS asks for **Microphone** and **Camera** access the first time; grant them to include voice and the webcam file.
+5. Click the icon again and press **Stop**, or use `⌃⌥⌘R`. The session appears in `~/Movies/RecBar/`.
 
-## Menu bar
+## The panel
 
-- **Start Recording / Stop & Save Recording** — `⌃⌥⌘R`
-- **Pause Recording / Resume Recording** — `⌃⌥⌘P` (pausing stops capture entirely, so it costs no CPU)
-- **Audio** — system audio toggle, multi-select microphones, system default, record all, refresh
-- **Camera** — webcam as a separate 720p file, or off
-- **Capture Display** — choose a monitor
-- **Quality** — Compact 1080p30, Balanced Native 30, Crisp Native 60
-- **Advanced** — keep segment files, show cursor, launch at login
-- **Open Recordings Folder / Open Last Recording / Reveal / Copy Path**
-- **Recover Interrupted Recordings…**
-- **Relaunch RecBar / Quit RecBar**
+Click the menu-bar icon to open RecBar's control panel. It is a compact surface, not a long menu:
+
+- **Status header** — READY when idle, a live REC timer while recording, and the free space on the recording volume.
+- **Primary control** — **Start Recording** starts capture and closes the panel. While recording the row becomes **Stop** and **Pause**; when paused it becomes **Resume**.
+- **Capture** — four tiles that open native menus:
+  - **Audio** — system audio plus a multi-select list of microphones.
+  - **Camera** — webcam off, or a separate file at the selected size.
+  - **Display** — choose a monitor.
+  - **Quality** — Compact 1080p30, Balanced Native 30, or Crisp Native 60.
+- **Options** — System Audio, Cursor, and At Login toggles, plus Keep Segment Files.
+- **Quick Actions** — open the recordings folder, play the last recording, or reveal it in Finder.
+- **Footer** — Copy Path, About, Relaunch, and Quit (`⌘Q`).
+- **Recovery banner** — appears only when an interrupted session can be recovered.
+
+Tiles show a subtle zoom, a brighter shade, and an accent border under the pointer. The panel closes when you click **Start Recording** or click anywhere outside it.
+
+While recording, the menu-bar item expands to show the live timer; when idle it shrinks back to the same compact width as the other menu-bar icons. Opening the panel does not move the icon.
+
+The global shortcuts work with the panel closed:
+
+- **Start / Stop** — `⌃⌥⌘R`
+- **Pause / Resume** — `⌃⌥⌘P` (pausing stops capture entirely, so it costs no CPU)
 
 While recording, the menu-bar icon and live timer switch to white on a dark or vibrant-dark menu bar and black on a light one. Both the artwork and the timer text use the same explicit colour, so they stay readable on translucent or coloured menu bars instead of being tinted into the background. While merging, the icon shows progress.
 
@@ -249,7 +261,7 @@ AVCapture camera ──────────> SegmentWriter(camera) ───
 - `MergeService` — AVMutableComposition + passthrough export; composes multi-track video and standalone audio, with an ffmpeg stream-copy fallback.
 - `RecoveryService` — scans interrupted sessions, unions manifest with disk, rebuilds all tracks.
 - `RecorderController` — start/pause/resume/stop, synchronized rotation, disk guard, auto-stop below 5 GB.
-- Menu bar UI — AppKit `NSStatusItem`, Carbon global hotkeys.
+- Menu bar UI — AppKit `NSStatusItem` and `NSPopover` hosting a SwiftUI panel, Carbon global hotkeys.
 
 ## Limits
 
@@ -276,3 +288,7 @@ AVCapture camera ──────────> SegmentWriter(camera) ───
 ## Privacy
 
 Recordings stay on your Mac under `~/Movies/RecBar/`. RecBar has no network code and no telemetry.
+
+## License
+
+RecBar is released under the [MIT License](LICENSE). Copyright © 2026 Puneet Vishnawat.
