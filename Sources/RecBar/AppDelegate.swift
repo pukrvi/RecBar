@@ -21,6 +21,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // Ask the system for Screen Recording at most once in the app's lifetime.
         // Every later start uses the alert + Relaunch flow instead of re-prompting.
         ScreenCaptureEngine.requestPermissionOnceOnFirstLaunch()
+        installMainMenu()
 
         let controller = RecorderController()
         self.controller = controller
@@ -30,6 +31,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let statusMenu = StatusMenuController(controller: controller)
         self.statusMenu = statusMenu
+
+        // Diagnostic hook for automated layout checks: open the panel once at launch.
+        if CommandLine.arguments.contains("--show-panel") {
+            Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                self?.statusMenu.showPanel()
+            }
+        }
 
         controller.onStateChanged = { [weak statusMenu] in statusMenu?.refresh() }
         controller.onTick = { [weak statusMenu] in statusMenu?.refresh() }
@@ -133,5 +142,77 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         default:
             return .terminateNow
         }
+    }
+
+    // MARK: Main menu
+
+    /// RecBar is an accessory app with no Dock icon, but a minimal main menu keeps
+    /// ⌘Q, ⌘H, About, and the standard text-editing shortcuts working while the
+    /// panel or an alert is focused.
+    private func installMainMenu() {
+        let mainMenu = NSMenu()
+
+        let appMenuItem = NSMenuItem()
+        mainMenu.addItem(appMenuItem)
+
+        let appMenu = NSMenu()
+        let about = NSMenuItem(
+            title: "About RecBar",
+            action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
+            keyEquivalent: ""
+        )
+        about.target = NSApp
+        appMenu.addItem(about)
+        appMenu.addItem(.separator())
+
+        let hide = NSMenuItem(
+            title: "Hide RecBar",
+            action: #selector(NSApplication.hide(_:)),
+            keyEquivalent: "h"
+        )
+        hide.target = NSApp
+        appMenu.addItem(hide)
+
+        let hideOthers = NSMenuItem(
+            title: "Hide Others",
+            action: #selector(NSApplication.hideOtherApplications(_:)),
+            keyEquivalent: "h"
+        )
+        hideOthers.keyEquivalentModifierMask = [.command, .option]
+        hideOthers.target = NSApp
+        appMenu.addItem(hideOthers)
+
+        let showAll = NSMenuItem(
+            title: "Show All",
+            action: #selector(NSApplication.unhideAllApplications(_:)),
+            keyEquivalent: ""
+        )
+        showAll.target = NSApp
+        appMenu.addItem(showAll)
+        appMenu.addItem(.separator())
+
+        let quit = NSMenuItem(
+            title: "Quit RecBar",
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        )
+        quit.target = NSApp
+        appMenu.addItem(quit)
+        appMenuItem.submenu = appMenu
+
+        let editMenuItem = NSMenuItem()
+        mainMenu.addItem(editMenuItem)
+
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenuItem.submenu = editMenu
+
+        NSApp.mainMenu = mainMenu
     }
 }
