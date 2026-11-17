@@ -14,19 +14,55 @@ No OBS. No cloud. No giant QuickTime capture file.
 
 **[Download RecBar.dmg](https://github.com/pukrvi/RecBar/releases/latest/download/RecBar.dmg)** — macOS 15 or later, Apple Silicon.
 
+Installing an update? Quit RecBar first (`⌘Q`). Install over the existing copy to keep your settings and recordings.
+
 1. Open the downloaded `RecBar.dmg`.
 2. Drag **RecBar** onto the **Applications** folder.
-3. Open **Applications → RecBar**. RecBar appears in the menu bar, not the Dock.
-4. The first launch is blocked because this build is ad-hoc signed, not notarized. Right-click **RecBar** in Applications and choose **Open**, then **Open** again. If macOS does not offer that, use **System Settings → Privacy & Security → Open Anyway**.
-5. Grant **Screen Recording**, then click **Relaunch RecBar** in the alert.
+3. Eject the disk image.
+4. Open **Applications → RecBar**. RecBar appears in the menu bar, not the Dock.
+5. macOS blocks the first launch because the build is ad-hoc signed, not notarized. Follow [**First launch**](#first-launch-gatekeeper) below.
 
-If macOS asks whether to replace an existing `RecBar`, choose **Replace** — that is the normal upgrade path. Recordings and settings are not touched.
-
-Each release also publishes `RecBar.dmg.sha256`:
+Each release also publishes `RecBar.dmg.sha256`. To verify the download:
 
 ```bash
 shasum -a 256 ~/Downloads/RecBar.dmg
 ```
+
+Compare the result with the checksum on the release page.
+
+### First launch (Gatekeeper)
+
+The published build is **ad-hoc signed, not notarized**. macOS cannot verify it, so the first launch is blocked. This is expected.
+
+1. Open **Applications** in Finder.
+2. **Right-click RecBar** and choose **Open**.
+3. Click **Open** again in the confirmation dialog.
+
+If macOS does not offer the right-click option, or if the alert only shows **Move to Trash** and **Done**:
+
+1. Try to open RecBar once and let macOS block it.
+2. Open **System Settings → Privacy & Security**.
+3. Scroll to the security section and click **Open Anyway**.
+4. Confirm with your password or Touch ID.
+5. Click **Open** in the warning that reappears.
+
+Apple's official instructions: [Safely open apps on your Mac](https://support.apple.com/en-us/102445).
+
+Do not disable Gatekeeper globally. The **Open Anyway** exception applies only to RecBar.
+
+After the app opens, grant **Screen Recording** and click **Relaunch RecBar** in the alert.
+
+### Upgrading
+
+1. Quit RecBar (`⌘Q`).
+2. Download the new DMG.
+3. Open it and drag **RecBar** onto **Applications**.
+4. Choose **Replace** when macOS asks.
+
+Settings and recordings are not touched. They live outside the app bundle:
+
+- Settings: `~/Library/Application Support/RecBar/settings.json`
+- Recordings: `~/Movies/RecBar/`
 
 ---
 
@@ -152,7 +188,7 @@ The build script prints the designated requirement so you can confirm it:
 designated => identifier "app.recbar.recorder"
 ```
 
-The app is ad-hoc signed with a stable designated requirement, so macOS keeps the Screen Recording grant across rebuilds. The published DMG is also ad-hoc signed; it is not notarized, which is why the first launch needs the one-time **Open** step above. A Developer ID certificate and notarization would remove that step.
+The app is ad-hoc signed with a stable designated requirement, so macOS keeps the Screen Recording grant across rebuilds. The published DMG is also ad-hoc signed; it is not notarized, which is why the first launch needs the one-time **Open** step in [First launch](#first-launch-gatekeeper). Apple's official instructions: [Safely open apps on your Mac](https://support.apple.com/en-us/102445). A Developer ID certificate and notarization would remove that step.
 
 ### Build the DMG
 
@@ -174,11 +210,12 @@ killall Finder
 
 ## First run
 
-1. Launch RecBar. It appears as a **record icon in the menu bar** (no Dock icon).
-2. Grant **Screen Recording** when macOS asks, then click **Relaunch RecBar** in the alert (or quit and reopen it).
-3. Click the menu-bar icon to open the panel, then click the **Audio** tile to enable system audio and select microphones.
-4. Click **Start Recording**. macOS asks for **Microphone** and **Camera** access the first time; grant them to include voice and the webcam file.
-5. Click the icon again and press **Stop**, or use `⌃⌥⌘R`. The session appears in `~/Movies/RecBar/`.
+After macOS allows the first launch, RecBar appears as a **record icon in the menu bar** (no Dock icon).
+
+1. Grant **Screen Recording** when macOS asks, then click **Relaunch RecBar** in the alert (or quit and reopen it).
+2. Click the menu-bar icon to open the panel, then click the **Audio** tile to enable system audio and select microphones.
+3. Click **Start Recording**. macOS asks for **Microphone** and **Camera** access the first time; grant them to include voice and the webcam file.
+4. Click the icon again and press **Stop**, or use `⌃⌥⌘R`. The session appears in `~/Movies/RecBar/`.
 
 ## The panel
 
@@ -268,10 +305,12 @@ AVCapture camera ──────────> SegmentWriter(camera) ───
 - Records a **display**, not a single window.
 - A hard crash loses at most the current 30-second segment per source; that window is configurable in `RecorderSettings.segmentSeconds`.
 - System audio is captured through ScreenCaptureKit; DRM-protected playback may be silent, which is a macOS limitation.
-- The published DMG is ad-hoc signed, not notarized, so the first launch requires the one-time **Open** step described in [Download](#download). A Developer ID certificate would remove it.
+- The published DMG is ad-hoc signed, not notarized, so the first launch requires the one-time **Open** step described in [First launch](#first-launch-gatekeeper). Apple's official instructions: [Safely open apps on your Mac](https://support.apple.com/en-us/102445). A Developer ID certificate would remove it.
 - Each additional microphone adds about 115 MB per hour.
 
 ## Troubleshooting
+
+**The app will not open** — the build is ad-hoc signed, not notarized. Right-click **RecBar** in Applications and choose **Open**. If macOS does not offer that, use **System Settings → Privacy & Security → Open Anyway**. Apple's official instructions: [Safely open apps on your Mac](https://support.apple.com/en-us/102445).
 
 **Menu bar icon missing** — RecBar is an accessory app (`LSUIElement`); check the menu bar, not the Dock. Quit and relaunch if needed.
 
